@@ -1,0 +1,5 @@
+openai-whisper
+pyannote.audio
+pyaudio
+Jinja2
+ollama
