@@ -168,7 +168,7 @@ elapsed_time = 0
 
 root = tk.Tk()
 root.title("Transcriber3000")
-root.geometry('900x900')
+root.geometry('900x1000')
 
 # Audio filename
 filename_label=tk.StringVar()
@@ -226,7 +226,7 @@ manual_audio_record_filename = tk.StringVar()
 manual_filename = tk.Entry(root, textvariable=manual_audio_record_filename)
 manual_filename.grid(row=9, column=2)
 manual_transcribe_and_speaker = tk.Button(root, text='Transcribe and Speakers', command=manual_audio)
-manual_transcribe_and_speaker.grid(row=9, column=3)
+manual_transcribe_and_speaker.grid(row=10, column=2)
 manual_summarize = tk.Button(root, text='Summarize', command=manual_summarize)
-manual_summarize.grid(row=9, column=4)
+manual_summarize.grid(row=10, column=3)
 root.mainloop()
