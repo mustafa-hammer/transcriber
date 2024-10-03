@@ -1,5 +1,6 @@
 import whisper
 from pyannote.audio import Pipeline
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 import utils
 from jinja2 import Environment, FileSystemLoader
 import warnings
@@ -16,18 +17,29 @@ def transcribe(audio_filepath, whisper_model_size):
     print('Generating transcript')
     asr_result = model.transcribe(audio_filepath, fp16=False)
     
-    transcript = asr_result['text']
-    print('Transcript:', transcript)
+    # transcript = asr_result['text']
+    # print('Transcript:', transcript)
     
     return(asr_result)
 
-def diarization(audio_filepath,hg_token):
+class PrintProgressHook(ProgressHook):
+    def on_epoch_start(self, epoch: int, total_epochs: int, **kwargs):
+        print(f"Starting epoch {epoch}/{total_epochs}")
+    
+    def on_batch_end(self, batch_idx: int, total_batches: int, **kwargs):
+        print(f"Processed batch {batch_idx}/{total_batches}")
+
+def diarization(audio_filepath, hg_token):
     warnings.filterwarnings("ignore", category=UserWarning)
     
     print('Generating diarization')
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=hg_token)
-    diarization_result = pipeline(audio_filepath)
-    return(diarization_result)
+    
+    # Use the custom progress hook
+    with PrintProgressHook() as hook:
+        diarization_result = pipeline(audio_filepath, hook=hook)
+    
+    return diarization_result
     
 def combine_transcribe_diarization(asr_result, diarization_result):
     final_result = utils.diarize_text(asr_result, diarization_result)
@@ -64,10 +76,10 @@ def write_to_file(meeting_note_filepath, transcript, title, date):
 
 def summarize_transcript_in_file(meeting_note_filepath):
     # Read the transcript from the file
-    print(meeting_note_filepath)
     with open(meeting_note_filepath, 'r') as f:
         content = f.read()
-
+    print("Generating summary")
+    
     # Isolate the transcript (assuming it's the main content)
     transcript = content.split("## Summary")[0].strip()
 
@@ -75,10 +87,14 @@ def summarize_transcript_in_file(meeting_note_filepath):
     summary = ollama.chat(model='llama3.1', messages=[
         {
             'role': 'user',
-            'content': f'Here is the {transcript}, Can you give me back only the summary text itself and nothing else. If you need to split section do it as markdown. This text will be going under a ##Summary header.',
+            'content': f"""I will provide you a transcript from a meeting.
+                        I want you to summarize and fill in these sections in Markdown: 
+                        ### General summary ### Summary for each speaker. You can identify each speaker in the transcript by SPEAKER_XX where XX is the number. 
+                        The output from here will go to a Markdown document so dont add anything that is not a summary, 
+                        thank you. Do not attempt to interpret tone or social dynamics, keep the summary dry. Here is the {transcript}""" 
         },
         ])
-    print(summary['message']['content'])
+    print("Summary generated")
     # Append the summary to the file
     with open(meeting_note_filepath, 'a') as f:
         f.write("\n\n## Summary\n")  

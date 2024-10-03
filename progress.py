@@ -18,4 +18,4 @@ pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1",
 
 # Use the custom progress hook to monitor diarization progress
 with PrintProgressHook() as hook:
-    diarization = pipeline("audio.wav", hook=hook)
+    diarization = pipeline("/Users/mustafa.elhilo/transcriber/short.wav", hook=hook)
