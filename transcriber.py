@@ -83,18 +83,26 @@ def summarize_transcript_in_file(meeting_note_filepath):
     # Isolate the transcript (assuming it's the main content)
     transcript = content.split("## Summary")[0].strip()
 
-    # Use Ollama to summarize the transcript
-    summary = ollama.chat(model='llama3.1', messages=[
+    messages = [
         {
-            'role': 'user',
-            'content': f"""I will provide you a transcript from a meeting.
+            'role': 'system',
+            'content': """I will provide you a transcript from a meeting.
                         I want you to summarize and fill in these sections in Markdown: 
                         ### General summary ### Summary for each speaker. You can identify each speaker in the transcript by SPEAKER_XX where XX is the number. 
                         The output from here will go to a Markdown document so dont add anything that is not a summary, 
-                        thank you. Do not attempt to interpret tone or social dynamics, keep the summary dry. Here is the {transcript}""" 
+                        thank you. Do not attempt to interpret tone or social dynamics, keep the summary dry. """
         },
-        ])
+        {
+            'role': 'user',
+            'content': f"""
+                        Here is the {transcript}""" 
+        }
+    ]
+   
+    summary = ollama.chat(model='llama3.1', messages=messages, options={'temperature': 0})
+
     print("Summary generated")
+    
     # Append the summary to the file
     with open(meeting_note_filepath, 'a') as f:
         f.write("\n\n## Summary\n")  

@@ -1,5 +1,5 @@
 import tkinter as tk
-import recorder
+from recorder import Recorder
 import audio_devices
 from datetime import datetime
 import transcriber
@@ -43,16 +43,26 @@ def start():
     if record_running is not None:
         print('Recording already running')
     else:
+        # Get selected device from the UI
         device_id = selected_device.get()
         
+        # Create a timestamped filename for the recording
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"{audio}{audio_record_filename.get()}_{timestamp}.wav"
 
+        # Check if device_id is valid
         if device_id.isdigit():
             device_id = int(device_id)
             print(f"Selected audio device: {device_id}")
+
+            # Initialize Recorder object if not already done
+            rec = Recorder(channels=2)
+
+            # Open the recording file with audio device
             record_running = rec.open(filename, audio_device=device_id, mode='wb')
-            record_running.start_recording()
+
+            # Start recording
+            record_running.start_recording(audio_device=device_id)
 
             # Change button color to indicate recording
             button_rec.config(fg='red')  # Change to red for recording
@@ -61,6 +71,7 @@ def start():
             threading.Thread(target=start_timer, daemon=True).start()
         else:
             print('Invalid device selection')
+
 
            
 def stop():
@@ -110,8 +121,7 @@ def summarize():
     else:
         summarize_running = 'running'
         file_namepath = F"{notes}{audio_record_filename.get()}_{timestamp}.md"
-        summary = transcriber.summarize_transcript_in_file(file_namepath)
-        print(summary)
+        transcriber.summarize_transcript_in_file(file_namepath)
        
 def manual_audio():
     global transcribe_and_diarization_running, manual_filename
@@ -147,7 +157,7 @@ def manual_summarize():
         transcriber.summarize_transcript_in_file(note_file_path)
 
 
-rec = recorder.Recorder(channels=1)
+# rec = recorder.Recorder(channels=2)
 record_running = None
 transcribe_running = None
 transcribe_and_diarization_running = None

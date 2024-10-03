@@ -63,12 +63,14 @@ class RecordingFile(object):
             self.wavefile.writeframes(audio)
         return None
 
-    def start_recording(self):
+    def start_recording(self, audio_device):
         # Use a stream with a callback in non-blocking mode
+        print(audio_device)
         self._stream = self._pa.open(format=pyaudio.paInt16,
                                         channels=self.channels,
                                         rate=self.rate,
                                         input=True,
+                                        input_device_index=audio_device,
                                         frames_per_buffer=self.frames_per_buffer,
                                         stream_callback=self.get_callback())
         self._stream.start_stream()
