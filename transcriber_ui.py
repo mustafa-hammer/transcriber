@@ -1,5 +1,6 @@
 import tkinter as tk
 from recorder import Recorder
+from recorder import convert_to_stereo_audio
 import audio_devices
 from datetime import datetime
 import transcriber
@@ -40,6 +41,8 @@ def devices():
 def start():
     global record_running, selected_device, audio_record_filename, filename, timestamp
 
+    filename_formatted = transcriber.file_name_formatting(audio_record_filename.get())
+
     if record_running is not None:
         print('Recording already running')
     else:
@@ -48,7 +51,7 @@ def start():
         
         # Create a timestamped filename for the recording
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"{audio}{audio_record_filename.get()}_{timestamp}.wav"
+        filename = f"{audio}{filename_formatted}_{timestamp}.wav"
 
         # Check if device_id is valid
         if device_id.isdigit():
@@ -75,7 +78,11 @@ def start():
 
            
 def stop():
-    global record_running, timer_running
+    global record_running, timer_running, audio_record_filename
+    
+    filename_formatted = transcriber.file_name_formatting(audio_record_filename.get())
+    filename = f"{audio}{filename_formatted}_{timestamp}.wav"
+    stereo_filename = f"{audio}{filename_formatted}_{timestamp}_stereo.wav"
 
     if record_running is not None:
         record_running.stop_recording()
@@ -83,47 +90,91 @@ def stop():
         record_running = None
         print('Audio recorder stopped')
 
+        print('Converting to stereo')
+        convert_to_stereo_audio(filename, stereo_filename)
+        print('Completed: Converting to stereo')
+
         # Reset button color and stop timer
         button_rec.config(bg='SystemButtonFace', fg='black')
         timer_label.config(text="Timer: 0 s")
-        timer_running = False  # Stop the timer
+        
+        # Stop the timer
+        timer_running = False  
     else:
         print('Audio recorder is not running')
 
 def transcribe_only():
     global transcribe_running, audio_record_filename
+
+    filename_formatted = transcriber.file_name_formatting(audio_record_filename.get())
+    filename = f"{audio}{filename_formatted}_{timestamp}.wav"
+    stereo_filename = f"{audio}{filename_formatted}_{timestamp}_stereo.wav"
+
     if transcribe_running is not None:
         print('transcribe_only already running')
     else:
         transcribe_running = 'running'
-        transcript = transcriber.transcribe(filename, whisper_model_size)
-        file_namepath = F"{notes}{audio_record_filename.get()}_{timestamp}.md"
-        transcriber.write_to_file(file_namepath, transcript, audio_record_filename.get(), timestamp)
+        transcript = transcriber.transcribe(stereo_filename, whisper_model_size)
+        file_namepath = F"{notes}{filename_formatted}_{timestamp}.md"
+        transcriber.write_to_file(file_namepath, transcript['text'], filename_formatted, timestamp)
+        transcribe_running = None
 
 def transcribe_and_diarization():
     global transcribe_and_diarization_running, audio_record_filename
+    
+    filename_formatted = transcriber.file_name_formatting(audio_record_filename.get())
+    filename = f"{audio}{filename_formatted}_{timestamp}.wav"
+    stereo_filename = f"{audio}{filename_formatted}_{timestamp}_stereo.wav"
+
     if transcribe_and_diarization_running is not None:
         print('transcribe_and_diarization already running')
     else:
         transcribe_and_diarization_running = 'running'
-        transcript = transcriber.transcribe(filename, whisper_model_size)
-        diarization = transcriber.diarization(filename, hg_token)
+        transcript = transcriber.transcribe(stereo_filename, whisper_model_size)
+        diarization = transcriber.diarization(stereo_filename, hg_token)
         combine = transcriber.combine_transcribe_diarization(transcript, diarization)
 
-        file_namepath = F"{notes}{audio_record_filename.get()}_{timestamp}.md"
+        file_namepath = F"{notes}{filename_formatted}_{timestamp}.md"
 
-        transcriber.write_to_file(file_namepath, combine, audio_record_filename.get(), timestamp)
+        transcriber.write_to_file(file_namepath, combine, filename_formatted, timestamp)
+        transcribe_and_diarization_running = None
 
 def summarize():
     global summarize_running, audio_record_filename
+    
+    filename_formatted = transcriber.file_name_formatting(audio_record_filename.get())
+
     if summarize_running is not None:
         print('Summarize already running')
     else:
         summarize_running = 'running'
-        file_namepath = F"{notes}{audio_record_filename.get()}_{timestamp}.md"
-        transcriber.summarize_transcript_in_file(file_namepath)
-       
-def manual_audio():
+        file_namepath = F"{notes}{filename_formatted}_{timestamp}.md"
+        summary_in_chunks = transcriber.summarize_transcript_in_chunks(file_namepath)
+        summary = transcriber.summarize_transcript_from_chunks(summary_in_chunks)
+        
+        transcriber.write_summary_to_notes(content = summary['message']['content'], meeting_note_filepath = file_namepath)
+        summarize_running = None
+
+def manual_transcribe():
+    global transcribe_running, manual_filename
+    if transcribe_running is not None:
+        print('Manual transcribe already running')
+    else:
+        file_path = manual_filename.get()
+        file_name = os.path.basename(manual_filename.get())
+        name = os.path.splitext(file_name)[0] 
+        note_file_path = file_path.replace("/record/", "/notes/")
+        note_file_path = note_file_path.replace(".wav", ".md")
+        note_file_path = note_file_path.replace("_stereo", "")
+
+        transcribe_running = 'running'
+        transcript = transcriber.transcribe(file_path, whisper_model_size)
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        transcriber.write_to_file(note_file_path, transcript['text'], name, timestamp)
+        transcribe_running = None
+
+def manual_transcribe_and_diarization():
     global transcribe_and_diarization_running, manual_filename
     
     if transcribe_and_diarization_running is not None:
@@ -134,8 +185,8 @@ def manual_audio():
         name = os.path.splitext(file_name)[0] 
         note_file_path = file_path.replace("/record/", "/notes/")
         note_file_path = note_file_path.replace(".wav", ".md")
+        note_file_path = note_file_path.replace("_stereo", "")
 
-        print(note_file_path)
         transcribe_and_diarization_running = 'running'
         transcript = transcriber.transcribe(file_path, whisper_model_size)
         diarization = transcriber.diarization(file_path, hg_token)
@@ -143,18 +194,23 @@ def manual_audio():
         
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         transcriber.write_to_file(note_file_path, combine, name, timestamp)
+        transcribe_and_diarization_running = None
 
 def manual_summarize():
     global summarize_running, manual_filename
     file_path = manual_filename.get()
     note_file_path = file_path.replace("/record/", "/notes/")
     note_file_path = note_file_path.replace(".wav", ".md")
+    note_file_path = note_file_path.replace("_stereo", "")
 
     if summarize_running is not None:
         print('Summarize already running')
     else:
         summarize_running = 'running'
-        transcriber.summarize_transcript_in_file(note_file_path)
+        summary_in_chunks = transcriber.summarize_transcript_in_chunks(note_file_path)
+        summary = transcriber.summarize_transcript_from_chunks(summary_in_chunks)
+        transcriber.write_summary_to_notes(content = summary['message']['content'], meeting_note_filepath = note_file_path)
+        summarize_running = None
 
 
 # rec = recorder.Recorder(channels=2)
@@ -211,22 +267,29 @@ transcribe = tk.Button(root, text='Transcribe Only', command=transcribe_only)
 transcribe.grid(row=6, column=1)
 
 transcribe_and_speaker = tk.Button(root, text='Transcribe and Speakers', command=transcribe_and_diarization)
-transcribe_and_speaker.grid(row=7, column=1)
+transcribe_and_speaker.grid(row=6, column=2)
 
 summarize = tk.Button(root, text='Summarize', command=summarize)
-summarize.grid(row=8, column=1)
+summarize.grid(row=6, column=3)
 
 # Manual audio filename
 manual_filename_label=tk.StringVar()
 manual_filename_label.set("Enter filename location:")
 manual_filename_value=tk.Label(root, textvariable=manual_filename_label, height=4)
-manual_filename_value.grid(row=9, column=1)
+manual_filename_value.grid(row=10, column=1)
 
 manual_audio_record_filename = tk.StringVar()
 manual_filename = tk.Entry(root, textvariable=manual_audio_record_filename)
-manual_filename.grid(row=9, column=2)
-manual_transcribe_and_speaker = tk.Button(root, text='Transcribe and Speakers', command=manual_audio)
-manual_transcribe_and_speaker.grid(row=10, column=2)
+manual_filename.grid(row=10, column=2)
+
+manual_transcribe_and_speaker = tk.Button(root, text='Transcribe and Speakers', command=manual_transcribe_and_diarization)
+manual_transcribe_and_speaker.grid(row=11, column=2)
+
+manual_transcribe = tk.Button(root, text='Transcribe', command=manual_transcribe)
+manual_transcribe.grid(row=11, column=3)
+
 manual_summarize = tk.Button(root, text='Summarize', command=manual_summarize)
-manual_summarize.grid(row=10, column=3)
+manual_summarize.grid(row=11, column=4)
+
+
 root.mainloop()

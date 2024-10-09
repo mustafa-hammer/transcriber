@@ -6,6 +6,3 @@
 
 ## Transcript:
 {{ transcript }}
-
-## Summary:
-{{ summary }}

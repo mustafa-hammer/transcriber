@@ -3,3 +3,9 @@ pyannote.audio
 pyaudio
 Jinja2
 ollama
+transformers
+langchain
+langchain-community 
+langchain-core
+langchain-ollama
+numpy
