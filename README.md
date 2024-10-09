@@ -1,5 +1,9 @@
 # transcriber
 
+## How it looks?
+
+![transcriber3000](screenshot/transcriber3000.png)
+
 ## What is this?
 
 A local Python application that does the following:
